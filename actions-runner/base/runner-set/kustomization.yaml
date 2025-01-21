@@ -1,29 +1,59 @@
-#apiVersion: kustomize.config.k8s.io/v1beta1
-#kind: Kustomization
-#
-#resources:
-#  - base/controller
-#  - base/runner-set
-#  - base/argocd-cm.yaml
-
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 helmCharts:
-
   - name: gha-runner-scale-set
     repo: oci://ghcr.io/actions/actions-runner-controller-charts
     version: 0.10.1
     releaseName: arc-runner-set
     namespace: arc-runners
     valuesInline:
-      githubConfigUrl: "https://github.com/<your_enterprise/org/repo>"
+      githubConfigUrl: <github org url>
       githubConfigSecret:
-        github_token: "<PAT>"
+        github_token: <github_token>
       controllerServiceAccount:
-        namespace: arc-system
-        name: gha-runner-scale-set-controller
+        namespace: arc-systems
+        name: arc-gha-rs-controller
+      containerMode:
+        type: "kubernetes"
+      template:
+        spec:
+#          initContainers: # needed to set permissions to use the PVC
+#            - name: kube-init
+#              image: ghcr.io/actions/actions-runner:latest
+#              command: [ "sudo", "chown", "-R", "runner:runner", "/home/runner/_work" ]
+#              volumeMounts:
+#                - name: work
+#                  mountPath: /home/runner/_work
+          containers:
+            - name: runner
+              image: ghcr.io/actions/actions-runner:latest
+              command: [ "/home/runner/run.sh" ]
+              env:
+                - name: ACTIONS_RUNNER_CONTAINER_HOOKS
+                  value: /home/runner/k8s/index.js
+                - name: ACTIONS_RUNNER_POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+                  value: "false"  # allow non-container steps, makes life easier
+              volumeMounts:
+                - name: work
+                  mountPath: /home/runner/_work
+          volumes:
+                 - name: work
+                   ephemeral:
+                     volumeClaimTemplate:
+                       spec:
+                         accessModes: [ "ReadWriteOnce" ]
+                         storageClassName: "local-path"
+                         resources:
+                           requests:
+                             storage: 1Gi
 
 resources:
-#  - namespace-arc-systems.yaml
   - namespace-arc-runners.yaml
+#  - storage-class-with-local-provisioner.yaml
+#  - pvc.yaml
+

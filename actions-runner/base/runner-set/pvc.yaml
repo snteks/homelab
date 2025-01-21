@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-k8s-cache-pvc
+  namespace: arc-runners
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+#  storageClassName: local-path # we'll need this in the runner Helm chart
+  storageClassName: k8s-mode # we'll need this in the runner Helm chart
