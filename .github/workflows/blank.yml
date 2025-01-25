@@ -27,4 +27,4 @@ jobs:
     # Step 5: Deploy to Kubernetes
     - name: Deploy to Kubernetes
       run: |
-        kubectl get pods -n default
+        curl https://localhost:6443 --insecure
