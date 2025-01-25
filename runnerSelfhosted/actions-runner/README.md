@@ -9,3 +9,4 @@ helm template arc-runner-set oci://ghcr.io/actions/actions-runner-controller-cha
 
 
 https://some-natalie.dev/blog/kaniko-in-arc/
+https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/quickstart-for-actions-runner-controller

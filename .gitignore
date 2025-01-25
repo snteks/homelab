@@ -1,3 +1,4 @@
 /actions-runner/base/controller/charts/
 /actions-runner/base/runner-set/charts/
 /.idea/
+.DS_Store

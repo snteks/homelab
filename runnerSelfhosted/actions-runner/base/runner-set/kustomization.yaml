@@ -8,9 +8,9 @@ helmCharts:
     releaseName: arc-runner-set
     namespace: arc-runners
     valuesInline:
-      githubConfigUrl: <github org url>
+      githubConfigUrl: "https://github.com/snteks/homelab"
       githubConfigSecret:
-        github_token: <github_token>
+        github_token: ""
       controllerServiceAccount:
         namespace: arc-systems
         name: arc-gha-rs-controller
@@ -18,17 +18,17 @@ helmCharts:
         type: "kubernetes"
       template:
         spec:
-#          initContainers: # needed to set permissions to use the PVC
-#            - name: kube-init
-#              image: ghcr.io/actions/actions-runner:latest
-#              command: [ "sudo", "chown", "-R", "runner:runner", "/home/runner/_work" ]
-#              volumeMounts:
-#                - name: work
-#                  mountPath: /home/runner/_work
+          #          initContainers: # needed to set permissions to use the PVC
+          #            - name: kube-init
+          #              image: ghcr.io/actions/actions-runner:latest
+          #              command: [ "sudo", "chown", "-R", "runner:runner", "/home/runner/_work" ]
+          #              volumeMounts:
+          #                - name: work
+          #                  mountPath: /home/runner/_work
           containers:
             - name: runner
               image: ghcr.io/actions/actions-runner:latest
-              command: [ "/home/runner/run.sh" ]
+              command: ["/home/runner/run.sh"]
               env:
                 - name: ACTIONS_RUNNER_CONTAINER_HOOKS
                   value: /home/runner/k8s/index.js
@@ -37,23 +37,22 @@ helmCharts:
                     fieldRef:
                       fieldPath: metadata.name
                 - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
-                  value: "false"  # allow non-container steps, makes life easier
+                  value: "false" # allow non-container steps, makes life easier
               volumeMounts:
                 - name: work
                   mountPath: /home/runner/_work
           volumes:
-                 - name: work
-                   ephemeral:
-                     volumeClaimTemplate:
-                       spec:
-                         accessModes: [ "ReadWriteOnce" ]
-                         storageClassName: "local-path"
-                         resources:
-                           requests:
-                             storage: 1Gi
+            - name: work
+              ephemeral:
+                volumeClaimTemplate:
+                  spec:
+                    accessModes: ["ReadWriteOnce"]
+                    storageClassName: "local-path"
+                    resources:
+                      requests:
+                        storage: 1Gi
 
 resources:
   - namespace-arc-runners.yaml
 #  - storage-class-with-local-provisioner.yaml
 #  - pvc.yaml
-
