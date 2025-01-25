@@ -27,5 +27,5 @@ jobs:
     # Step 5: Deploy to Kubernetes
     - name: Deploy to Kubernetes
       run: |
-        ifconfig
+        ipconfig
         curl https://localhost:6443 --insecure
