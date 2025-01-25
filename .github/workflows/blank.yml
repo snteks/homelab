@@ -21,8 +21,8 @@ jobs:
       with:
         version: 'latest'
 
-    - name: Configure kubeconfig
-      run: echo "${{ secrets.KUBECONFIG }}" | base64 --decode > kubeconfig && export KUBECONFIG=kubeconfig
+    # - name: Configure kubeconfig
+    #   run: echo "${{ secrets.KUBECONFIG }}" | base64 --decode > kubeconfig && export KUBECONFIG=kubeconfig
 
     # Step 5: Deploy to Kubernetes
     - name: Deploy to Kubernetes
