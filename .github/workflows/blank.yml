@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: arc-runner-set
+    runs-on: self-hosted
 
     steps:
     # Step 1: Check out the repository
@@ -27,5 +27,4 @@ jobs:
     # Step 5: Deploy to Kubernetes
     - name: Deploy to Kubernetes
       run: |
-        ipconfig
-        curl https://localhost:6443 --insecure
+        kubectl get pods -A
