@@ -1,0 +1,1 @@
+kubectl kustomize --enable-helm . | kubectl apply --server-side -f -
