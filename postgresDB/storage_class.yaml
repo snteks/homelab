@@ -1,0 +1,21 @@
+# apiVersion: storage.k8s.io/v1
+# kind: StorageClass
+# metadata:
+#   name: nfs-storageclass
+# parameters:
+#   archiveOnDelete: "false"
+#   path: /mnt/nfs-share
+#   server: <your-nfs-server-ip>
+# provisioner: nfs-client-provisioner
+# reclaimPolicy: Delete
+# volumeBindingMode: Immediate
+#
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: smb-storageclass
+parameters:
+  source: "smb://your-windows-server-ip/your-share-name"
+  mounter: "smb"
+provisioner: smb.csi.k8s.io
