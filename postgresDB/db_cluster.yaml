@@ -1,0 +1,52 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+  namespace: database
+spec:
+  description: Postgres Cluster for the pgadmin application
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2
+  instances: 3
+  storage:
+    size: 1Gi
+    # storageClass: smb-storageclass
+  wal:
+    size: 1Gi
+    # storageClass: smb-storageclass
+  postgresql:
+    parameters:
+      archive_mode: always
+      archive_timeout: 5min
+
+  monitoring:
+    enablePodMonitor: true
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://your-bucket-name/
+      endpointURL: https://s3.amazonaws.com
+      s3Credentials:
+        accessKeyId:
+          name: s3-credentials
+          key: AWS_ACCESS_KEY_ID
+        secretAccessKey:
+          name: s3-credentials
+          key: AWS_SECRET_ACCESS_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: 14d
+
+  externalClusters:
+    - name: clusterRestoreFromAWSS3
+      barmanObjectStore:
+        destinationPath: s3://your-bucket-name/
+        endpointURL: https://s3.amazonaws.com
+        s3Credentials:
+          accessKeyId:
+            name: s3-credentials
+            key: AWS_ACCESS_KEY_ID
+          secretAccessKey:
+            name: s3-credentials
+            key: AWS_SECRET_ACCESS_KEY
