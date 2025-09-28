@@ -1,0 +1,452 @@
+import React, { useState, useEffect } from 'react';
+import { Upload, Download, Trash2, RefreshCw, File, Folder, Search, AlertCircle, CheckCircle, X } from 'lucide-react';
+
+const S3Interface = () => {
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [currentPath, setCurrentPath] = useState('');
+  
+  // AWS S3 Configuration (replace with your actual config)
+  const [config, setConfig] = useState({
+    accessKeyId: '',
+    secretAccessKey: '',
+    region: 'us-east-1',
+    bucketName: ''
+  });
+
+  // Mock S3 service for demonstration
+  const s3Service = {
+    listObjects: async (prefix = '') => {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock data - replace with actual AWS SDK calls
+      const mockFiles = [
+        { key: 'documents/report.pdf', size: 1024576, lastModified: new Date('2024-01-15'), isFolder: false },
+        { key: 'images/', size: 0, lastModified: new Date('2024-01-10'), isFolder: true },
+        { key: 'images/photo1.jpg', size: 2048576, lastModified: new Date('2024-01-12'), isFolder: false },
+        { key: 'images/photo2.png', size: 1536000, lastModified: new Date('2024-01-13'), isFolder: false },
+        { key: 'videos/demo.mp4', size: 52428800, lastModified: new Date('2024-01-14'), isFolder: false }
+      ];
+      
+      return mockFiles.filter(file => file.key.startsWith(prefix));
+    },
+
+    uploadFile: async (file, key, onProgress) => {
+      // Simulate upload progress
+      return new Promise((resolve) => {
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += Math.random() * 20;
+          if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            onProgress(progress);
+            resolve({ key, size: file.size });
+          } else {
+            onProgress(progress);
+          }
+        }, 200);
+      });
+    },
+
+    downloadFile: async (key) => {
+      // Simulate download - replace with actual S3 download URL generation
+      const blob = new Blob(['Mock file content'], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = key.split('/').pop();
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+
+    deleteFile: async (key) => {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { deleted: key };
+    }
+  };
+
+  const showMessage = (message, type = 'success') => {
+    if (type === 'success') {
+      setSuccess(message);
+      setError('');
+      setTimeout(() => setSuccess(''), 3000);
+    } else {
+      setError(message);
+      setSuccess('');
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
+  const loadFiles = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const fileList = await s3Service.listObjects(currentPath);
+      setFiles(fileList);
+    } catch (err) {
+      showMessage('Failed to load files: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpload = async (event) => {
+    const uploadFiles = Array.from(event.target.files);
+    if (!uploadFiles.length) return;
+
+    try {
+      setError('');
+      const uploads = uploadFiles.map(async (file) => {
+        const key = currentPath + file.name;
+        setUploadProgress(prev => ({ ...prev, [key]: 0 }));
+        
+        await s3Service.uploadFile(file, key, (progress) => {
+          setUploadProgress(prev => ({ ...prev, [key]: progress }));
+        });
+        
+        setUploadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[key];
+          return newProgress;
+        });
+      });
+
+      await Promise.all(uploads);
+      showMessage(`Successfully uploaded ${uploadFiles.length} file(s)`);
+      await loadFiles();
+    } catch (err) {
+      showMessage('Upload failed: ' + err.message, 'error');
+    }
+    
+    event.target.value = '';
+  };
+
+  const handleDownload = async (fileKey) => {
+    try {
+      setError('');
+      await s3Service.downloadFile(fileKey);
+      showMessage(`Downloaded ${fileKey.split('/').pop()}`);
+    } catch (err) {
+      showMessage('Download failed: ' + err.message, 'error');
+    }
+  };
+
+  const handleDelete = async (fileKey) => {
+    if (!window.confirm(`Are you sure you want to delete ${fileKey}?`)) return;
+
+    try {
+      setError('');
+      await s3Service.deleteFile(fileKey);
+      showMessage(`Deleted ${fileKey}`);
+      await loadFiles();
+    } catch (err) {
+      showMessage('Delete failed: ' + err.message, 'error');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedFiles.length) return;
+    if (!window.confirm(`Delete ${selectedFiles.length} selected files?`)) return;
+
+    try {
+      setError('');
+      await Promise.all(selectedFiles.map(key => s3Service.deleteFile(key)));
+      showMessage(`Deleted ${selectedFiles.length} files`);
+      setSelectedFiles([]);
+      await loadFiles();
+    } catch (err) {
+      showMessage('Bulk delete failed: ' + err.message, 'error');
+    }
+  };
+
+  const toggleFileSelection = (fileKey) => {
+    setSelectedFiles(prev => 
+      prev.includes(fileKey) 
+        ? prev.filter(key => key !== fileKey)
+        : [...prev, fileKey]
+    );
+  };
+
+  const navigateToFolder = (folderKey) => {
+    setCurrentPath(folderKey);
+    setSelectedFiles([]);
+  };
+
+  const navigateUp = () => {
+    const pathParts = currentPath.split('/').filter(Boolean);
+    pathParts.pop();
+    setCurrentPath(pathParts.length ? pathParts.join('/') + '/' : '');
+    setSelectedFiles([]);
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const filteredFiles = files.filter(file =>
+    file.key.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  useEffect(() => {
+    loadFiles();
+  }, [currentPath]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-slate-800 mb-2">S3 File Manager</h1>
+          <p className="text-slate-600">Manage your S3 bucket files with ease</p>
+        </div>
+
+        {/* Alerts */}
+        {(error || success) && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+            error ? 'bg-red-50 border border-red-200 text-red-700' : 
+                   'bg-green-50 border border-green-200 text-green-700'
+          }`}>
+            {error ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+            <span>{error || success}</span>
+            <button 
+              onClick={() => { setError(''); setSuccess(''); }}
+              className="ml-auto text-current hover:opacity-70"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* Configuration Panel */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">AWS Configuration</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="Access Key ID"
+              value={config.accessKeyId}
+              onChange={(e) => setConfig(prev => ({ ...prev, accessKeyId: e.target.value }))}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="password"
+              placeholder="Secret Access Key"
+              value={config.secretAccessKey}
+              onChange={(e) => setConfig(prev => ({ ...prev, secretAccessKey: e.target.value }))}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              placeholder="Region (e.g., us-east-1)"
+              value={config.region}
+              onChange={(e) => setConfig(prev => ({ ...prev, region: e.target.value }))}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              placeholder="Bucket Name"
+              value={config.bucketName}
+              onChange={(e) => setConfig(prev => ({ ...prev, bucketName: e.target.value }))}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <label className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors flex items-center gap-2">
+              <Upload size={18} />
+              Upload Files
+              <input
+                type="file"
+                multiple
+                onChange={handleUpload}
+                className="hidden"
+              />
+            </label>
+            
+            <button
+              onClick={loadFiles}
+              disabled={loading}
+              className="bg-slate-500 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+
+            {selectedFiles.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Trash2 size={18} />
+                Delete Selected ({selectedFiles.length})
+              </button>
+            )}
+          </div>
+
+          {/* Search and Navigation */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 min-w-64">
+              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search files..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {currentPath && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={navigateUp}
+                  className="text-blue-500 hover:text-blue-600 font-medium"
+                >
+                  ← Back
+                </button>
+                <span className="text-slate-500">/{currentPath}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Upload Progress */}
+        {Object.keys(uploadProgress).length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">Upload Progress</h3>
+            {Object.entries(uploadProgress).map(([key, progress]) => (
+              <div key={key} className="mb-3">
+                <div className="flex justify-between text-sm text-slate-600 mb-1">
+                  <span>{key.split('/').pop()}</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* File List */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800">
+              Files {filteredFiles.length > 0 && `(${filteredFiles.length})`}
+            </h2>
+          </div>
+
+          {loading ? (
+            <div className="p-12 text-center">
+              <RefreshCw size={32} className="animate-spin text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">Loading files...</p>
+            </div>
+          ) : filteredFiles.length === 0 ? (
+            <div className="p-12 text-center">
+              <File size={48} className="text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500">No files found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="text-left p-4 font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.length === filteredFiles.filter(f => !f.isFolder).length}
+                        onChange={(e) => setSelectedFiles(
+                          e.target.checked ? filteredFiles.filter(f => !f.isFolder).map(f => f.key) : []
+                        )}
+                        className="rounded"
+                      />
+                    </th>
+                    <th className="text-left p-4 font-medium text-slate-600">Name</th>
+                    <th className="text-left p-4 font-medium text-slate-600">Size</th>
+                    <th className="text-left p-4 font-medium text-slate-600">Modified</th>
+                    <th className="text-left p-4 font-medium text-slate-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFiles.map((file) => (
+                    <tr key={file.key} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="p-4">
+                        {!file.isFolder && (
+                          <input
+                            type="checkbox"
+                            checked={selectedFiles.includes(file.key)}
+                            onChange={() => toggleFileSelection(file.key)}
+                            className="rounded"
+                          />
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          {file.isFolder ? <Folder className="text-blue-500" size={20} /> : <File className="text-slate-400" size={20} />}
+                          <span
+                            className={file.isFolder ? "text-blue-600 hover:text-blue-700 cursor-pointer font-medium" : "text-slate-700"}
+                            onClick={file.isFolder ? () => navigateToFolder(file.key) : undefined}
+                          >
+                            {file.key.split('/').pop() || file.key}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-600">
+                        {file.isFolder ? '-' : formatFileSize(file.size)}
+                      </td>
+                      <td className="p-4 text-slate-600">
+                        {file.lastModified.toLocaleDateString()}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          {!file.isFolder && (
+                            <>
+                              <button
+                                onClick={() => handleDownload(file.key)}
+                                className="text-blue-500 hover:text-blue-600 p-1"
+                                title="Download"
+                              >
+                                <Download size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(file.key)}
+                                className="text-red-500 hover:text-red-600 p-1"
+                                title="Delete"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default S3Interface;

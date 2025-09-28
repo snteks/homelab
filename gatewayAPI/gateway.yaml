@@ -1,0 +1,31 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: traefik
+  namespace: default
+spec:
+  gatewayClassName: traefik
+
+  # Only Routes from the same namespace are allowed.
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 8000         # Traefik HTTP default port, adjust as needed
+      allowedRoutes:
+        namespaces:
+          from: All    # All => Allow all routes unconditionally
+                              # Same => Allow routes in the same namespace
+    - name: https
+      protocol: HTTPS
+      port: 8443         # Traefik HTTPS default port, adjust as needed
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: traefik-tls-secret
+            namespace: default
+
+      allowedRoutes:
+        namespaces:
+          from: All   # All => Allow all routes unconditionally
+                             # Same => Allow routes in the same namespace

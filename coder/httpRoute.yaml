@@ -1,0 +1,22 @@
+# HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: whoami-httproute
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik
+      namespace: default
+  hostnames:
+    - coder.snteks.com #192.168.64.2.nip.io # Add this domain to your DNS Server
+      # Or add to /etc/hosts
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: coder
+          namespace: coder
+          port: 80
