@@ -1,9 +1,6 @@
 Install CloudNative operator
-    kubectl apply --server-side -f \
-      https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.24.2.yaml
-
-    kubectl apply --server-side -f \
-      https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.6.yaml
+kubectl apply --server-side -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml
 
 Install DB cluster in namespace database
   apply ns.yaml
@@ -21,4 +18,4 @@ Kubernetes cluster upgrade
   now you will see new nodes come online
 
 
-argocd app create guestbook --repo https://github.com/snteks/homelab.git --path postgresDB --dest-server https://kubernetes.default.svc --dest-namespace database
+argocd app create postgresDB --repo https://github.com/snteks/homelab.git --path postgresDB --dest-server https://kubernetes.default.svc --dest-namespace database

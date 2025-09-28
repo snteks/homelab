@@ -1,0 +1,637 @@
+import React, { useState, useEffect } from 'react';
+import { Upload, Download, Trash2, RefreshCw, File, Folder, Search, AlertCircle, CheckCircle, X, Plus, FolderPlus } from 'lucide-react';
+import { S3Client, ListObjectsV2Command, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+const S3Interface = () => {
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [currentPath, setCurrentPath] = useState('');
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [userInfo, setUserInfo] = useState(null);
+  const [s3Client, setS3Client] = useState(null);
+  
+  // Configuration - these should come from environment variables
+  const BUCKET_NAME = process.env.REACT_APP_S3_BUCKET_NAME || 'your-bucket-name';
+  const AWS_REGION = process.env.REACT_APP_AWS_REGION || 'us-east-1';
+
+  // Initialize Keycloak and AWS S3 Client
+  useEffect(() => {
+    initializeKeycloak();
+  }, []);
+
+  const initializeKeycloak = async () => {
+    try {
+      // Initialize Keycloak (you'll need to install keycloak-js: npm install keycloak-js)
+      const Keycloak = (await import('keycloak-js')).default;
+      
+      const keycloak = new Keycloak({
+        url: process.env.REACT_APP_KEYCLOAK_URL || 'http://localhost:8080',
+        realm: process.env.REACT_APP_KEYCLOAK_REALM || 'your-realm',
+        clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'your-client-id'
+      });
+
+      const authenticated = await keycloak.init({
+        onLoad: 'login-required',
+        checkLoginIframe: false
+      });
+
+      if (authenticated) {
+        // Extract user information
+        const userInfo = {
+          username: keycloak.tokenParsed?.preferred_username || 'unknown',
+          email: keycloak.tokenParsed?.email || '',
+          name: keycloak.tokenParsed?.name || '',
+          token: keycloak.token
+        };
+        
+        setUserInfo(userInfo);
+        
+        // Initialize S3 client with temporary credentials
+        // In production, you would exchange the Keycloak token for AWS credentials
+        // through a backend service that uses AWS STS AssumeRoleWithWebIdentity
+        await initializeS3Client(userInfo);
+      }
+    } catch (err) {
+      console.error('Keycloak initialization failed:', err);
+      showMessage('Authentication failed. Please try again.', 'error');
+    }
+  };
+
+  const initializeS3Client = async (userInfo) => {
+    try {
+      // In production, call your backend service to exchange Keycloak token for AWS credentials
+      const credentials = await exchangeTokenForAWSCredentials(userInfo.token);
+      
+      const client = new S3Client({
+        region: AWS_REGION,
+        credentials: {
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          sessionToken: credentials.sessionToken
+        }
+      });
+      
+      setS3Client(client);
+    } catch (err) {
+      console.error('S3 client initialization failed:', err);
+      showMessage('Failed to initialize S3 connection', 'error');
+    }
+  };
+
+  // Mock function - replace with actual backend call
+  const exchangeTokenForAWSCredentials = async (keycloakToken) => {
+    // This should call your backend service that:
+    // 1. Validates the Keycloak token
+    // 2. Uses AWS STS AssumeRoleWithWebIdentity to get temporary credentials
+    // 3. Returns the temporary credentials
+    
+    // For demo purposes, throwing an error to show the flow
+    throw new Error('Backend service not implemented. Please implement token exchange service.');
+    
+    // Example of what your backend should return:
+    // return {
+    //   accessKeyId: 'ASIA...',
+    //   secretAccessKey: 'xxx...',
+    //   sessionToken: 'xxx...',
+    //   expiration: new Date()
+    // };
+  };
+
+  const showMessage = (message, type = 'success') => {
+    if (type === 'success') {
+      setSuccess(message);
+      setError('');
+      setTimeout(() => setSuccess(''), 3000);
+    } else {
+      setError(message);
+      setSuccess('');
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
+  const getUserPrefix = () => {
+    return userInfo ? `users/${userInfo.username}/` : '';
+  };
+
+  const getFullPath = (path = '') => {
+    return getUserPrefix() + (currentPath || '') + path;
+  };
+
+  const loadFiles = async () => {
+    if (!s3Client) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      
+      const prefix = getFullPath();
+      const command = new ListObjectsV2Command({
+        Bucket: BUCKET_NAME,
+        Prefix: prefix,
+        Delimiter: '/'
+      });
+
+      const response = await s3Client.send(command);
+      
+      const folders = (response.CommonPrefixes || []).map(prefix => ({
+        key: prefix.Prefix.replace(getUserPrefix(), ''),
+        size: 0,
+        lastModified: new Date(),
+        isFolder: true
+      }));
+
+      const files = (response.Contents || [])
+        .filter(obj => obj.Key !== prefix) // Remove the prefix itself
+        .map(obj => ({
+          key: obj.Key.replace(getUserPrefix(), ''),
+          size: obj.Size,
+          lastModified: obj.LastModified,
+          isFolder: false
+        }));
+
+      setFiles([...folders, ...files]);
+    } catch (err) {
+      console.error('Error loading files:', err);
+      showMessage('Failed to load files: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpload = async (event) => {
+    const uploadFiles = Array.from(event.target.files);
+    if (!uploadFiles.length || !s3Client) return;
+
+    try {
+      setError('');
+      
+      for (const file of uploadFiles) {
+        const key = getFullPath(file.name);
+        setUploadProgress(prev => ({ ...prev, [key]: 0 }));
+        
+        const command = new PutObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: key,
+          Body: file,
+          ContentType: file.type
+        });
+
+        // Simulate progress for demo - in production you might use multipart upload for large files
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            const current = prev[key] || 0;
+            const increment = Math.random() * 20;
+            const newProgress = Math.min(current + increment, 90);
+            return { ...prev, [key]: newProgress };
+          });
+        }, 200);
+
+        await s3Client.send(command);
+        
+        clearInterval(progressInterval);
+        setUploadProgress(prev => ({ ...prev, [key]: 100 }));
+        
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[key];
+            return newProgress;
+          });
+        }, 1000);
+      }
+
+      showMessage(`Successfully uploaded ${uploadFiles.length} file(s)`);
+      await loadFiles();
+    } catch (err) {
+      console.error('Upload error:', err);
+      showMessage('Upload failed: ' + err.message, 'error');
+    }
+    
+    event.target.value = '';
+  };
+
+  const handleDownload = async (fileKey) => {
+    if (!s3Client) return;
+    
+    try {
+      setError('');
+      const command = new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: getFullPath().replace(currentPath, '') + fileKey
+      });
+
+      const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      
+      // Create a temporary link to download the file
+      const link = document.createElement('a');
+      link.href = signedUrl;
+      link.download = fileKey.split('/').pop();
+      link.click();
+      
+      showMessage(`Downloaded ${fileKey.split('/').pop()}`);
+    } catch (err) {
+      console.error('Download error:', err);
+      showMessage('Download failed: ' + err.message, 'error');
+    }
+  };
+
+  const handleDelete = async (fileKey) => {
+    if (!s3Client) return;
+    if (!window.confirm(`Are you sure you want to delete ${fileKey}?`)) return;
+
+    try {
+      setError('');
+      const command = new DeleteObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: getFullPath().replace(currentPath, '') + fileKey
+      });
+
+      await s3Client.send(command);
+      showMessage(`Deleted ${fileKey}`);
+      await loadFiles();
+    } catch (err) {
+      console.error('Delete error:', err);
+      showMessage('Delete failed: ' + err.message, 'error');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedFiles.length || !s3Client) return;
+    if (!window.confirm(`Delete ${selectedFiles.length} selected files?`)) return;
+
+    try {
+      setError('');
+      const deletePromises = selectedFiles.map(fileKey => {
+        const command = new DeleteObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: getFullPath().replace(currentPath, '') + fileKey
+        });
+        return s3Client.send(command);
+      });
+
+      await Promise.all(deletePromises);
+      showMessage(`Deleted ${selectedFiles.length} files`);
+      setSelectedFiles([]);
+      await loadFiles();
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      showMessage('Bulk delete failed: ' + err.message, 'error');
+    }
+  };
+
+  const createFolder = async () => {
+    if (!newFolderName.trim() || !s3Client) return;
+
+    try {
+      setError('');
+      const folderKey = getFullPath(newFolderName.trim() + '/');
+      
+      // Create an empty object to represent the folder
+      const command = new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: folderKey,
+        Body: '',
+        ContentType: 'application/x-directory'
+      });
+
+      await s3Client.send(command);
+      showMessage(`Created folder: ${newFolderName}`);
+      setShowCreateFolder(false);
+      setNewFolderName('');
+      await loadFiles();
+    } catch (err) {
+      console.error('Create folder error:', err);
+      showMessage('Failed to create folder: ' + err.message, 'error');
+    }
+  };
+
+  const toggleFileSelection = (fileKey) => {
+    setSelectedFiles(prev => 
+      prev.includes(fileKey) 
+        ? prev.filter(key => key !== fileKey)
+        : [...prev, fileKey]
+    );
+  };
+
+  const navigateToFolder = (folderKey) => {
+    setCurrentPath(folderKey);
+    setSelectedFiles([]);
+  };
+
+  const navigateUp = () => {
+    const pathParts = currentPath.split('/').filter(Boolean);
+    pathParts.pop();
+    setCurrentPath(pathParts.length ? pathParts.join('/') + '/' : '');
+    setSelectedFiles([]);
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const filteredFiles = files.filter(file =>
+    file.key.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  useEffect(() => {
+    if (s3Client) {
+      loadFiles();
+    }
+  }, [currentPath, s3Client]);
+
+  if (!userInfo) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw size={48} className="animate-spin text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600">Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-800 mb-2">S3 File Manager</h1>
+            <p className="text-slate-600">Welcome, {userInfo.name || userInfo.username}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-slate-500">Logged in as</p>
+            <p className="font-medium text-slate-700">{userInfo.email}</p>
+          </div>
+        </div>
+
+        {/* Alerts */}
+        {(error || success) && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+            error ? 'bg-red-50 border border-red-200 text-red-700' : 
+                   'bg-green-50 border border-green-200 text-green-700'
+          }`}>
+            {error ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+            <span>{error || success}</span>
+            <button 
+              onClick={() => { setError(''); setSuccess(''); }}
+              className="ml-auto text-current hover:opacity-70"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <label className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors flex items-center gap-2">
+              <Upload size={18} />
+              Upload Files
+              <input
+                type="file"
+                multiple
+                onChange={handleUpload}
+                className="hidden"
+                disabled={!s3Client}
+              />
+            </label>
+            
+            <button
+              onClick={() => setShowCreateFolder(true)}
+              disabled={!s3Client}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <FolderPlus size={18} />
+              New Folder
+            </button>
+            
+            <button
+              onClick={loadFiles}
+              disabled={loading || !s3Client}
+              className="bg-slate-500 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+
+            {selectedFiles.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Trash2 size={18} />
+                Delete Selected ({selectedFiles.length})
+              </button>
+            )}
+          </div>
+
+          {/* Search and Navigation */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 min-w-64">
+              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search files..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500">/{getUserPrefix()}</span>
+              {currentPath && (
+                <>
+                  <button
+                    onClick={navigateUp}
+                    className="text-blue-500 hover:text-blue-600 font-medium"
+                  >
+                    ← Back
+                  </button>
+                  <span className="text-slate-500">{currentPath}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Create Folder Modal */}
+        {showCreateFolder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96 max-w-90vw">
+              <h3 className="text-lg font-semibold mb-4">Create New Folder</h3>
+              <input
+                type="text"
+                placeholder="Folder name"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+                onKeyPress={(e) => e.key === 'Enter' && createFolder()}
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowCreateFolder(false);
+                    setNewFolderName('');
+                  }}
+                  className="px-4 py-2 text-slate-600 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createFolder}
+                  disabled={!newFolderName.trim()}
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Progress */}
+        {Object.keys(uploadProgress).length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">Upload Progress</h3>
+            {Object.entries(uploadProgress).map(([key, progress]) => (
+              <div key={key} className="mb-3">
+                <div className="flex justify-between text-sm text-slate-600 mb-1">
+                  <span>{key.split('/').pop()}</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* File List */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800">
+              Files {filteredFiles.length > 0 && `(${filteredFiles.length})`}
+            </h2>
+          </div>
+
+          {!s3Client ? (
+            <div className="p-12 text-center">
+              <AlertCircle size={48} className="text-orange-400 mx-auto mb-4" />
+              <p className="text-slate-500 mb-2">S3 connection not available</p>
+              <p className="text-sm text-slate-400">Please ensure your backend service is configured for token exchange</p>
+            </div>
+          ) : loading ? (
+            <div className="p-12 text-center">
+              <RefreshCw size={32} className="animate-spin text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">Loading files...</p>
+            </div>
+          ) : filteredFiles.length === 0 ? (
+            <div className="p-12 text-center">
+              <File size={48} className="text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500">No files found</p>
+              <p className="text-sm text-slate-400 mt-2">Upload some files or create a folder to get started</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="text-left p-4 font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.length === filteredFiles.filter(f => !f.isFolder).length && filteredFiles.filter(f => !f.isFolder).length > 0}
+                        onChange={(e) => setSelectedFiles(
+                          e.target.checked ? filteredFiles.filter(f => !f.isFolder).map(f => f.key) : []
+                        )}
+                        className="rounded"
+                      />
+                    </th>
+                    <th className="text-left p-4 font-medium text-slate-600">Name</th>
+                    <th className="text-left p-4 font-medium text-slate-600">Size</th>
+                    <th className="text-left p-4 font-medium text-slate-600">Modified</th>
+                    <th className="text-left p-4 font-medium text-slate-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFiles.map((file) => (
+                    <tr key={file.key} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="p-4">
+                        {!file.isFolder && (
+                          <input
+                            type="checkbox"
+                            checked={selectedFiles.includes(file.key)}
+                            onChange={() => toggleFileSelection(file.key)}
+                            className="rounded"
+                          />
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          {file.isFolder ? <Folder className="text-blue-500" size={20} /> : <File className="text-slate-400" size={20} />}
+                          <span
+                            className={file.isFolder ? "text-blue-600 hover:text-blue-700 cursor-pointer font-medium" : "text-slate-700"}
+                            onClick={file.isFolder ? () => navigateToFolder(file.key) : undefined}
+                          >
+                            {file.key.split('/').filter(Boolean).pop() || file.key}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-600">
+                        {file.isFolder ? '-' : formatFileSize(file.size)}
+                      </td>
+                      <td className="p-4 text-slate-600">
+                        {file.lastModified.toLocaleDateString()}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          {!file.isFolder && (
+                            <>
+                              <button
+                                onClick={() => handleDownload(file.key)}
+                                className="text-blue-500 hover:text-blue-600 p-1"
+                                title="Download"
+                              >
+                                <Download size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(file.key)}
+                                className="text-red-500 hover:text-red-600 p-1"
+                                title="Delete"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default S3Interface;

@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml # Define your namespace here
+  - deployment.yaml # Your application deployment
+  - service.yaml # Your application service
+
+# Define the Vault secret generator
+vaultSecretGenerator:
+  - name: my-secret
+    path: secrets/myapp/my-secret
+    secretKey: value
+
+# Common labels for all resources
+commonLabels:
+  app: myapp
+
+# Patches to customize resources if necessary
+patchesStrategicMerge:
+  - patch-deployment.yaml # Optional, if you need to modify deployment settings
+
+# ConfigMap generator if needed
+configMapGenerator:
+  - name: my-config
+    literals:
+      - key1=value1
+      - key2=value2
+# Add any other configurations or generators as needed
