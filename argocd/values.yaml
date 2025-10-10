@@ -1,0 +1,79 @@
+configs:
+  cm:
+    kustomize.buildOptions: --enable-helm
+controller:
+  # Controller config flags
+  config:
+    # Allow unrestricted loading (adjust based on security needs)
+    # You can add more kustomize options here if needed
+    # loadRestrictions: none
+
+  # Resource settings:
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+
+server:
+  # Enable extra args for server if needed (example showing enable helm arg)
+
+  ingress:
+    enabled: false
+    # Configure ingress settings if using ingress
+    # hosts:
+    #   - argocd.example.com
+    # tls:
+    #   - secretName: argocd-secret-tls
+    #     hosts:
+    #       - argocd.example.com
+
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+repoServer:
+  # Configure repository server resource limits and settings
+  resources:
+    limits:
+      cpu: "300m"
+      memory: "128Mi"
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
+
+  # Enable Helm client cache
+  # cache:
+  #   enabled: true
+
+dex:
+  enabled: false
+  # If enabled, configure dex OIDC connector here
+
+# RBAC settings if needed, example:
+rbac:
+  policy: |
+    p, role:admin, applications, *, */*, allow
+  scopes:
+    - api
+    - login
+
+# Application Set controller (if installed separately)
+applicationSet:
+  enabled: true
+
+# Metrics and monitoring example
+metrics:
+  enabled: true
+  # Configure Prometheus annotations for scraping
+  service:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8082"
+# Additional configs for custom resource limits, tolerations, affinity can be added here

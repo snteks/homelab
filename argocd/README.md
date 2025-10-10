@@ -13,7 +13,7 @@ This document provides step-by-step instructions for installing ArgoCD in a Kube
    Use the following command to install ArgoCD in your Kubernetes cluster:
 
    ```bash
-   kubectl kustomize . | kubectl apply -f -
+   kubectl kustomize --enable-helm . | kubectl apply -f -
    ```
 
 2. **Accessing ArgoCD**:
