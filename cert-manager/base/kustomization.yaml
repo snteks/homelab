@@ -9,9 +9,5 @@ helmCharts:
     releaseName: cert-manager
     valuesInline:
       installCRDs: true
-      prometheus:
-        enabled: true
-        servicemonitor:
-          enabled: true
 resources:
   - ns.yaml

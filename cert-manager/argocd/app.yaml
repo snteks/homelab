@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/snteks/homelab.git
     path: cert-manager/overlays/dev
-    targetRevision: HEAD
+    targetRevision: feature-cert-manager
     
   destination:
     server: https://kubernetes.default.svc
