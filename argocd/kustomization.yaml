@@ -4,6 +4,7 @@ kind: Kustomization
 
 resources:
   - ns.yaml
+  - projects.yaml
 
 helmCharts:
   - name: argo-cd

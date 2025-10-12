@@ -1,4 +1,25 @@
 configs:
+  repositories:
+    snteks-homelab:
+      name: snteks-homelab
+      url: https://github.com/snteks/homelab.git
+      type: git
+    snteks-core-security:
+      name: snteks-core-security
+      url: https://github.com/snteks/snteks-core-security.git
+      type: git
+    snteks-core-networking:
+      name: snteks-core-networking
+      url: https://github.com/snteks/snteks-core-networking.git
+      type: git
+    snteks-core-observability:
+      name: snteks-core-observability
+      url: https://github.com/snteks/snteks-core-observability.git
+      type: git
+    snteks-core-applications:
+      name: snteks-core-applications
+      url: https://github.com/snteks/snteks-core-applications.git
+      type: git
   cm:
     kustomize.buildOptions: --enable-helm
 controller:

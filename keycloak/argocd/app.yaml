@@ -1,18 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cert-manager
+  name: keycloak
   namespace: argocd
 spec:
-  project: snteks-core-security
+  project: default
   source:
     repoURL: https://github.com/snteks/homelab.git
-    path: cert-manager/overlays/dev
-    targetRevision: feature-cert-manager
+    path: keycloak/overlays/dev
     
   destination:
     server: https://kubernetes.default.svc
-    namespace: cert-manager
+    namespace: keycloak
   syncPolicy:
     automated:
       prune: true

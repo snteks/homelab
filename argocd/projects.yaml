@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: snteks-core-security
+  namespace: argocd
+spec:
+  description: Project for core security components
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: '*'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: snteks-core-networking
+  namespace: argocd
+spec:
+  description: Project for core networking components
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: '*'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: snteks-core-observability
+  namespace: argocd
+spec:
+  description: Project for core observability components
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: '*'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: snteks-core-applications
+  namespace: argocd
+spec:
+  description: Project for core applications
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: '*'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
