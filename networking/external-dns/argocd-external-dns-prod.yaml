@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/snteks/homelab.git
-    targetRevision: HEAD
+    targetRevision: feature-cert-manager
     path: networking/external-dns/overlays/prod # Path to your Kustomize overlay within the repo
   destination:
     server: https://kubernetes.default.svc
