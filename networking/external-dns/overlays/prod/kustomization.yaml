@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: external-dns
+resources:
+- secret.yaml
+- namespace.yaml
+
+helmCharts:
+- name: external-dns
+  repo: https://kubernetes-sigs.github.io/external-dns/
+  version: 1.19.0
+  releaseName: external-dns
+  namespace: external-dns
+  valuesInline:
+    provider:
+      name: cloudflare
+    env:
+      - name: CF_API_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: cloudflare-credentials
+            key: api_token

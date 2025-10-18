@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: external-dns
+resources:
+- namespace.yaml
+
+helmCharts:
+- name: external-dns
+  repo: https://kubernetes-sigs.github.io/external-dns/
+  version: 1.19.0
+  releaseName: external-dns
+  namespace: external-dns
+  valuesInline:
+    provider:
+      name: rfc2136
+    extraArgs:
+      - --rfc2136-host=YOUR_LOCAL_DNS_HOST # e.g., 192.168.1.1
+      - --rfc2136-port=53
+      - --rfc2136-zone=dev.example.com # e.g., your local domain

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-dns-prod
+  namespace: argocd # Assuming ArgoCD is installed in the 'argocd' namespace
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/snteks/homelab.git
+    targetRevision: HEAD
+    path: networking/external-dns/overlays/prod # Path to your Kustomize overlay within the repo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-dns # The namespace where external-dns will be deployed
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true # Automatically create the target namespace if it doesn't exist

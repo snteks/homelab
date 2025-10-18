@@ -1,0 +1,11 @@
+provider:
+  name: rfc2136
+
+extraArgs:
+  - --rfc2136-host=YOUR_LOCAL_DNS_HOST # e.g., 192.168.1.1
+  - --rfc2136-port=53
+  - --rfc2136-zone=dev.example.com # e.g., your local domain
+  # - --rfc2136-tsig-secret=<base64_encoded_tsig_secret>
+  # - --rfc2136-tsig-secret-alg=hmac-sha256
+  # - --rfc2136-tsig-keyname=externaldns-key
+  # - --rfc2136-tsig-axfr
