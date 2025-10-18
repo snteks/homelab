@@ -4,21 +4,21 @@ configs:
       name: snteks-homelab
       url: https://github.com/snteks/homelab.git
       type: git
-    snteks-core-security:
-      name: snteks-core-security
-      url: https://github.com/snteks/snteks-core-security.git
+    k8s-core-security:
+      name: k8s-core-security
+      url: https://github.com/snteks/k8s-core-security.git
       type: git
-    snteks-core-networking:
-      name: snteks-core-networking
-      url: https://github.com/snteks/snteks-core-networking.git
+    k8s-core-networking:
+      name: k8s-core-networking
+      url: https://github.com/snteks/k8s-core-networking.git
       type: git
-    snteks-core-observability:
-      name: snteks-core-observability
-      url: https://github.com/snteks/snteks-core-observability.git
+    k8s-core-observability:
+      name: k8s-core-observability
+      url: https://github.com/snteks/k8s-core-observability.git
       type: git
-    snteks-core-applications:
-      name: snteks-core-applications
-      url: https://github.com/snteks/snteks-core-applications.git
+    k8s-custom-applications:
+      name: k8s-custom-applications
+      url: https://github.com/snteks/k8s-custom-applications.git
       type: git
   cm:
     kustomize.buildOptions: --enable-helm
@@ -48,8 +48,7 @@ server:
     #   - argocd.example.com
     # tls:
     #   - secretName: argocd-secret-tls
-    #     hosts:
-    #       - argocd.example.com
+    #     hosts:    #       - argocd.example.com
 
   resources:
     limits:
@@ -78,7 +77,7 @@ dex:
   # If enabled, configure dex OIDC connector here
 
 # RBAC settings if needed, example:
-rbac:
+rabc:
   policy: |
     p, role:admin, applications, *, */*, allow
   scopes:

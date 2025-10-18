@@ -14,7 +14,21 @@ This document provides step-by-step instructions for installing ArgoCD in a Kube
 
    ```bash
    kubectl kustomize --enable-helm . | kubectl apply -f -
+   kubectl apply -f projects.yaml -n argocd
    ```
+
+3.  **Update Repository Secrets with Git Credentials (for private repositories):**
+    If you are using private Git repositories, you will need to update the corresponding ArgoCD repository secrets with your Git credentials (username and Personal Access Token/password).
+
+    For each repository secret (`argocd-repo-<repo-name>`), use the following command. Replace `YOUR_GIT_USERNAME` and `YOUR_GIT_PASSWORD_OR_PAT` with your actual credentials.
+
+    ```bash
+    kubectl patch secret argocd-repo-<repo-name> -n argocd --type merge -p '{"stringData":{"username":"YOUR_GIT_USERNAME","password":"YOUR_GIT_PASSWORD_OR_PAT"}}'
+    ```
+    *Example for `k8s-core-networking` repository:*
+    ```bash
+    kubectl patch secret argocd-repo-k8s-core-networking -n argocd --type merge -p '{"stringData":{"username":"YOUR_GIT_USERNAME","password":"YOUR_GIT_PASSWORD_OR_PAT"}}'
+    ```
 
 2. **Accessing ArgoCD**:
    After ArgoCD is installed, there are two ways to access it:
