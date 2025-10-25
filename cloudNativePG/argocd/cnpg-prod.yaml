@@ -11,7 +11,7 @@ spec:
 
   source:
     repoURL: https://github.com/snteks/homelab.git # Update with your repo
-    targetRevision: feature/cert-managerg/your-repo.git # Update with your repo
+    targetRevision: feature/cert-manager # Update with your repo
     path: overlays/prod
 
   destination:
