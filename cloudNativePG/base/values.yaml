@@ -1,0 +1,8 @@
+# File: base/values.yaml
+crds:
+  create: true
+
+config:
+  data:
+    INHERITED_ANNOTATIONS: "*"
+    INHERITED_LABELS: "*"
