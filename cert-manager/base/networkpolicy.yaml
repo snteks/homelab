@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-default-deny
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow HTTPS to ACME servers and Cloudflare API
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow communication to Kubernetes API server
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443
