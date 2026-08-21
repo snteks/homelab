@@ -87,8 +87,7 @@ helm repo update
 helm template cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --version <NEW_VERSION> \
-  --set crds.enabled=true \
-  --set config.enableGatewayAPI=true \
+  -f base/values.yaml \
   > base/helm-output.yaml
 
 # Review the diff

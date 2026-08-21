@@ -61,7 +61,8 @@ kubectl get gatewayclass cilium \
 ├── base/
 │   ├── kustomization.yaml
 │   ├── namespace.yaml         # namespace: cert-manager
-│   ├── helm-output.yaml       # cert-manager v1.17.1 (helm template output)
+│   ├── values.yaml            # Helm values (Gateway API, DNS resolvers)
+│   ├── helm-output.yaml       # cert-manager v1.17.1 (helm template -f values.yaml)
 │   ├── clusterissuer.yaml     # staging + prod ClusterIssuers (DNS-01/Cloudflare)
 │   ├── networkpolicy.yaml     # default-deny with ACME/DNS/API egress
 │   └── externalsecret.yaml    # Cloudflare API token via ESO (commented out until ESO ready)
@@ -72,7 +73,9 @@ kubectl get gatewayclass cilium \
     └── application.yaml       # only if ArgoCD present
 ```
 
-- `base/helm-output.yaml` is the output of `helm template` for cert-manager.
+- `base/values.yaml` contains the Helm values used to render `helm-output.yaml`.
+  Edit this file to change cert-manager configuration, then re-render.
+- `base/helm-output.yaml` is the output of `helm template -f values.yaml`.
   This allows installation via `kubectl apply -k` without requiring the Helm CLI
   at deploy time.
 - `base/` contains environment-agnostic manifests for cert-manager and its config.
@@ -124,8 +127,7 @@ helm repo update
 helm template cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --version <NEW_VERSION> \
-  --set crds.enabled=true \
-  --set config.enableGatewayAPI=true \
+  -f base/values.yaml \
   > base/helm-output.yaml
 
 # Review diff, then apply

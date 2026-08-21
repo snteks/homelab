@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - helm-output.yaml        # cert-manager v1.17.1 (helm template output)
+  - helm-output.yaml        # cert-manager v1.17.1 (helm template -f values.yaml)
   - clusterissuer.yaml
   - networkpolicy.yaml
   # - externalsecret.yaml   # requires ESO CRDs; enable once External Secrets Operator is installed
