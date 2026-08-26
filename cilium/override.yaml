@@ -1,0 +1,14 @@
+provision:
+  - mode: system
+    script: |
+      #!/bin/sh
+      set -e
+      # Make mounts shared — required for Cilium init containers to bind-mount
+      # /sys/fs/bpf and /run/cilium/cgroupv2 into containers.
+      mount --make-shared /sys/fs/bpf
+      mount --make-shared /run
+
+      # Disable flannel CNI and kube-proxy so Cilium can take over as the sole CNI
+      # and handle kube-proxy replacement via eBPF.
+      mkdir -p /etc/rancher/k3s
+      printf 'flannel-backend: "none"\ndisable-network-policy: true\ndisable-kube-proxy: true\n' > /etc/rancher/k3s/config.yaml

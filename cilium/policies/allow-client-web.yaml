@@ -1,0 +1,37 @@
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-client-web
+  namespace: policy-test
+spec:
+  # Apply to the web pod — allow inbound HTTP from client pods.
+  endpointSelector:
+    matchLabels:
+      app: web
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app: client
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-client-egress
+  namespace: policy-test
+spec:
+  # Apply to the client pod — allow outbound HTTP to web pods.
+  endpointSelector:
+    matchLabels:
+      app: client
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app: web
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP

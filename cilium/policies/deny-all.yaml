@@ -1,0 +1,12 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: policy-test
+spec:
+  # Select all pods in the namespace.
+  podSelector: {}
+  # Enable enforcement for both directions with no rules = deny all.
+  policyTypes:
+    - Ingress
+    - Egress
