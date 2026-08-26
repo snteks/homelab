@@ -1,0 +1,27 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: block-ingress-enforce-gateway-api
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: deny-ingress
+      match:
+        any:
+          - resources:
+              kinds: [Ingress]
+      validate:
+        message: "Ingress is prohibited. Use an HTTPRoute attached to gateway-system/shared-gw."
+        deny: {}
+    - name: deny-app-gateways
+      match:
+        any:
+          - resources:
+              kinds: [Gateway]
+      exclude:
+        any:
+          - resources:
+              namespaces: [gateway-system]
+      validate:
+        message: "Gateways are platform-owned. Create an HTTPRoute against gateway-system/shared-gw."
+        deny: {}
