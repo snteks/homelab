@@ -1,0 +1,41 @@
+# Cilium Helm values — pinned install for Rancher Desktop local lab
+# Chart version: cilium-1.20.1  App version: 1.20.1
+# Installed: 2026-08-21  Namespace: kube-system
+#
+# Apply with:
+#   helm upgrade --install cilium cilium/cilium --version 1.20.1 \
+#     --namespace kube-system -f helm-values.yaml
+
+cluster:
+  name: rancher-desktop
+
+cni:
+  # Docker mode in Rancher Desktop expects CNI binaries at the default path.
+  # The containerd CRI plugin inside Docker looks at /opt/cni/bin.
+  binPath: /opt/cni/bin
+
+# kube-proxy replacement — requires flannel and kube-proxy both disabled.
+# k8sServiceHost is 127.0.0.1 (loopback within the VM) so it survives
+# Lima IP changes on restart.
+kubeProxyReplacement: true
+k8sServiceHost: "127.0.0.1"
+k8sServicePort: 6443
+
+operator:
+  # Single-node cluster — keep only one replica to avoid Pending forever.
+  replicas: 1
+
+# Tunnel routing (VXLAN) — compatible with k3s podCIDR allocation and
+# simpler to debug than native routing on a local VM.
+routingMode: tunnel
+tunnelProtocol: vxlan
+
+# IPAM — use k3s podCIDR allocations.
+ipam:
+  mode: kubernetes
+
+# Gateway API — required for gatewayAPI/ project.
+# Cilium 1.20.x requires CRDs v1.6.1 (including tlsroutes + backendtlspolicies).
+l7Proxy: true
+gatewayAPI:
+  enabled: true
