@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - httproute.yaml
+  # certificate.yaml and referencegrant.yaml removed: wildcard *.dev.snteks.com cert
+  # is managed at the shared Gateway level (gatewayAPI/base/gateway.yaml).
+  # backup/volumesnapshot-cron.yaml skipped: local-path CSI has no snapshot support.
+
+# Image tag pin — bump this for upgrades (see README §Upgrade Procedure).
+# Read upstream release notes before bumping; SQLite migrations are one-way.
+images:
+  - name: ghcr.io/actualbudget/actual-server
+    newTag: "25.7.1"

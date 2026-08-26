@@ -1,0 +1,86 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: snapshot-sa
+  namespace: actual
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: snapshot-creator
+  namespace: actual
+rules:
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["create", "get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: snapshot-creator
+  namespace: actual
+subjects:
+  - kind: ServiceAccount
+    name: snapshot-sa
+    namespace: actual
+roleRef:
+  kind: Role
+  name: snapshot-creator
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: actual-snapshot
+  namespace: actual
+spec:
+  # Nightly at 02:00 UTC — after the app is least active
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: snapshot-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: snapshot
+              # Pin kubectl version to match cluster; update alongside cluster upgrades
+              image: bitnami/kubectl:1.31
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  SNAPNAME="actual-data-$(date +%Y%m%d-%H%M%S)"
+                  cat <<EOF | kubectl apply -f -
+                  apiVersion: snapshot.storage.k8s.io/v1
+                  kind: VolumeSnapshot
+                  metadata:
+                    name: ${SNAPNAME}
+                    namespace: actual
+                    labels:
+                      app: actual
+                      managed-by: snapshot-cron
+                  spec:
+                    # TODO: replace with your VolumeSnapshotClass name.
+                    # Run: kubectl get volumesnapshotclass
+                    volumeSnapshotClassName: longhorn-snapshot
+                    source:
+                      persistentVolumeClaimName: actual-data
+                  EOF
+                  echo "Created snapshot: ${SNAPNAME}"
+
+                  # Prune: keep only the 14 most recent snapshots
+                  kubectl get volumesnapshot -n actual \
+                    -l managed-by=snapshot-cron \
+                    --sort-by=.metadata.creationTimestamp \
+                    -o name | head -n -14 | xargs -r kubectl delete -n actual
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 64Mi

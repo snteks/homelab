@@ -1,0 +1,27 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: actual
+  namespace: actual
+spec:
+  endpointSelector:
+    matchLabels:
+      app: actual
+  ingress:
+    # Cilium Gateway API traffic arrives with reserved identity "ingress" (cilium_host).
+    # Standard NetworkPolicy ipBlock cannot match this; CiliumNetworkPolicy entity is required.
+    - fromEntities:
+        - ingress
+  egress:
+    # DNS
+    - toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    # HTTPS: for bank sync providers if enabled later
+    - toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

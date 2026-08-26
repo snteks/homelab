@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: actual-tls
+  namespace: actual
+spec:
+  secretName: actual-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    # TODO: replace with your actual hostname
+    - actual.homelab.local

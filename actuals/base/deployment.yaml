@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: actual
+  namespace: actual
+spec:
+  replicas: 1
+  # Recreate: SQLite + RWO PVC = single writer only; RollingUpdate risks dual-writer corruption
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: actual
+  template:
+    metadata:
+      labels:
+        app: actual
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000   # node user in ghcr.io/actualbudget/actual-server; verify for each pinned tag
+        runAsGroup: 1000
+        fsGroup: 1000     # ensures /data PVC is writable by the app
+      containers:
+        - name: actual
+          # Image tag is pinned in overlays/prod/kustomization.yaml — do not use latest here
+          image: ghcr.io/actualbudget/actual-server:25.7.1
+          ports:
+            - containerPort: 5006
+          env:
+            - name: ACTUAL_PORT
+              value: "5006"
+            - name: ACTUAL_TRUSTED_PROXIES
+              # Set to your pod CIDR or the gateway-system pod IP range.
+              # With Cilium the default pod CIDR is typically 10.0.0.0/8; verify with:
+              #   kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'
+              value: "10.0.0.0/8"
+            - name: ACTUAL_SERVER_FILES
+              value: /data/server-files
+            - name: ACTUAL_USER_FILES
+              value: /data/user-files
+          envFrom:
+            - secretRef:
+                name: actual-server-secret
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # TCP probe: /health existence not verified for this tag.
+          # After first deploy: kubectl exec -n actual <pod> -- curl -s localhost:5006/health
+          # If it returns 200, switch to httpGet on /health.
+          livenessProbe:
+            tcpSocket:
+              port: 5006
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 5006
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+              # No CPU limit: Node.js benefits from burst; avoid CFS throttling
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: actual-data

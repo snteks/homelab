@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: actual
+  labels:
+    # Required: allows HTTPRoutes in this namespace to attach to the shared Gateway
+    gateway-access: "true"
